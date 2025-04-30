@@ -1,0 +1,22 @@
+.env
+# Ignore Python virtual environment
+.venv/
+__pycache__/
+
+# Ignore general cache and system folders
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ignore IDE/workspace settings
+.vscode/
+.idea/
+
+# Avoid tracking files from outside the repo (like OneDrive/Desktop/etc.)
+../../*

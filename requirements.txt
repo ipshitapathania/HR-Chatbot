@@ -1,0 +1,9 @@
+numpy>=1.24.0
+tqdm>=4.66.0
+python-dotenv>=1.0.0
+sentence-transformers>=2.2.2
+faiss-cpu>=1.7.4
+langchain>=0.1.0
+langchain-groq>=0.1.0
+
+
