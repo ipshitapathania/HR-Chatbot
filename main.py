@@ -1,6 +1,6 @@
 import time
 from config import GROQ_API_KEY
-from data_loader import load_candidates
+from data_loader import get_candidate_by_phone
 from llm_interface import initialize_groq_llm
 from interview_manager import ConversationalHRAssistant
 
@@ -9,12 +9,11 @@ def main():
         print("GROQ_API_KEY environment variable not set.")
         return
 
-    candidate_db = load_candidates()
     groq_llm = initialize_groq_llm(GROQ_API_KEY)
     hr_assistant = ConversationalHRAssistant(groq_llm=groq_llm)
 
     phone_number = input("Enter phone number of the candidate: ").strip()
-    candidate_info = hr_assistant.identify_candidate(phone_number, candidate_db)
+    candidate_info = get_candidate_by_phone(phone_number)
     if not candidate_info:
         print("Candidate not found.")
         return

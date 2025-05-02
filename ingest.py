@@ -6,6 +6,7 @@ from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
 from config import PINECONE_API_KEY, PINECONE_INDEX_NAME
+from pinecone import ServerlessSpec
 
 # Local file path for JSON
 JSON_PATH = "dummy-resume.json"
@@ -32,8 +33,9 @@ def initialize_pinecone():
     if PINECONE_INDEX_NAME not in pc.list_indexes().names():
         pc.create_index(
             name=PINECONE_INDEX_NAME,
-            dimension=384,  # matches all-MiniLM-L6-v2 model
-            metric="cosine"
+            dimension=384,
+            metric="cosine",
+            spec=ServerlessSpec(cloud="aws", region="us-east-1")
         )
         print(f"Creating new Pinecone index: {PINECONE_INDEX_NAME}")
         # Wait for index to be ready
