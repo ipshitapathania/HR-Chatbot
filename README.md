@@ -2,7 +2,7 @@
 An intelligent HR chatbot that conducts initial screening interviews using Retrieval-Augmented Generation (RAG) to personalize conversations based on candidate resumes stored in a vector database.
 
 ## **Prerequisites** 
-Python 3.9+
+Python 3.9+\n
 Pinecone API key
 Groq API key
 .env file with your credentials
