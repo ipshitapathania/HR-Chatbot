@@ -17,22 +17,33 @@ class ConversationalHRAssistant:
         self.candidate_info = None
         self.interview_ended = False
         self.question_count = 0
-        self.max_questions = 7
+        self.max_questions = 15  # Increase max questions to cover tech topics too
         self.awaiting_candidate_questions = False
         self.asked_question_topics = set()
-        
-        # Define key HR topics that must be covered in logical interview order
+
+        # HR topics in logical order
         self.hr_topics = [
-            "current_role_question",        # Start with current role/background
-            "technical_skills_question",    # Technical experience/projects
-            "new_opportunity_question",     # What they're looking for
-            "career_goals_question",        # Career aspirations
-            "location_preferences_question", # Location preferences
-            "notice_period_question",       # Notice period
-            "salary_expectations_question"  # Salary last, after establishing rapport
+            "current_role_question",
+            "technical_skills_question",   # General tech experience here (can stay in HR if you want)
+            "new_opportunity_question",
+            "career_goals_question",
+            "location_preferences_question",
+            "notice_period_question",
+            "salary_expectations_question"
         ]
-        # Track which topics have been covered
         self.covered_topics = set()
+
+        # Separate technical topics (deep dive into tech skills/projects etc)
+        self.tech_topics = [
+            "tech_project_deep_dive",
+            "tech_function_design",
+            "tech_syntax_and_language",
+            "tech_problem_solving",
+            "tech_education_application"
+        ]
+        self.covered_tech_topics = set()
+
+        self.tech_stage_started = False  # Track if we've moved on to tech questions
 
     def _get_llm(self):
         if self.use_model == "groq" and self.groq_llm:
@@ -73,44 +84,37 @@ class ConversationalHRAssistant:
         except Exception:
             return "Could you elaborate on that?"
 
-    def generate_general_hr_question(self, last_response=None):
-        # First, check if we need to cover specific topics still
-        uncovered_topics = [topic for topic in self.hr_topics if topic not in self.covered_topics]
-        
-        if uncovered_topics:
-            # Choose the next logical topic in sequence rather than randomly
-            for topic in self.hr_topics:
-                if topic not in self.covered_topics:
-                    chosen_topic = topic
-                    break
-            
-            self.covered_topics.add(chosen_topic)
-            
-            # Use topic-specific prompt
-            question = self._generate_question(chosen_topic)
-            
-            # Basic validation to ensure we have a single question
-            if question.count('?') > 1 or "Here are" in question or "Example:" in question or "*" in question:
-                # Try one more time with the same prompt
-                question = self._generate_question(chosen_topic)
-                # If still problematic, use a simple question form
-                if question.count('?') > 1 or "Here are" in question or "Example:" in question or "*" in question:
-                    # Extract topic from prompt key
-                    topic_name = chosen_topic.replace("_question", "").replace("_", " ")
-                    question = f"Could you tell me about your {topic_name}?"
-            
-        elif last_response and self.question_count < 3:
-            # After covering all required topics, use follow-up questions to maintain natural flow
-            question = self._generate_question("followup_question", last_response=last_response)
-            chosen_topic = "followup"
+    def generate_next_question(self, last_response=None, resume=""):
+        # If tech stage hasn't started, cover HR topics first
+        if not self.tech_stage_started:
+            uncovered_hr = [t for t in self.hr_topics if t not in self.covered_topics]
+            if uncovered_hr:
+                topic = uncovered_hr[0]
+                self.covered_topics.add(topic)
+                question = self._generate_question(topic)
+            else:
+                # HR topics done, start technical stage
+                self.tech_stage_started = True
+                topic = self.tech_topics[0]
+                self.covered_tech_topics.add(topic)
+                question = self._generate_question(topic, resume=resume)
         else:
-            # Fallback to general questions if needed
-            question = self._generate_question("general_hr_question")
-            chosen_topic = "general"
+            # Technical stage ongoing
+            uncovered_tech = [t for t in self.tech_topics if t not in self.covered_tech_topics]
+            if uncovered_tech:
+                topic = uncovered_tech[0]
+                self.covered_tech_topics.add(topic)
+                question = self._generate_question(topic, resume=resume)
+            else:
+                # All tech topics covered, fallback to follow-ups or general
+                if last_response and self.question_count < self.max_questions:
+                    question = self._generate_question("tech_followup_question", last_response=last_response)
+                    topic = "tech_followup"
+                else:
+                    question = self._generate_question("general_hr_question")
+                    topic = "general"
         
-        # Add the topic to the list of asked questions
-        self.asked_question_topics.add(chosen_topic)
-        
+        self.asked_question_topics.add(topic)
         self.add_to_history("HR", question)
         return question
 
@@ -149,7 +153,7 @@ class ConversationalHRAssistant:
             else:
                 self.current_stage = "interview"
                 intro_msg = "Great! I'd like to ask you a few questions about your background and experience to see if there's a good fit with our current openings."
-                first_question = self.generate_general_hr_question()
+                first_question = self.generate_next_question()
                 return f"{intro_msg}\n\n{first_question}"
 
         # Interview stage
@@ -161,37 +165,41 @@ class ConversationalHRAssistant:
 
             if "?" in candidate_response:
                 hr_reply = self.handle_candidate_questions(candidate_response)
-                
-                # Check if we're ready to wrap up based on covered topics
-                if len(self.covered_topics) >= len(self.hr_topics):
+
+                # Check if we're ready to wrap up
+                total_covered = len(self.covered_topics) + len(self.covered_tech_topics)
+                if total_covered >= (len(self.hr_topics) + len(self.tech_topics)):
                     self.current_stage = "wrap_up"
                     wrap_msg = "Thank you for sharing all this valuable information! Do you have any other questions for me about the position or our company?"
                     self.add_to_history("HR", wrap_msg)
                     return f"{hr_reply}\n\n{wrap_msg}"
-                
-                follow_up = self.generate_general_hr_question()
+
+                follow_up = self.generate_next_question()
                 return f"{hr_reply}\n\n{follow_up}"
 
             self.question_count += 1
-            
-            # Check if we've covered all topics or reached max questions
-            if len(self.covered_topics) >= len(self.hr_topics) or self.question_count >= self.max_questions:
+
+            total_covered = len(self.covered_topics) + len(self.covered_tech_topics)
+            if total_covered >= (len(self.hr_topics) + len(self.tech_topics)) or self.question_count >= self.max_questions:
                 self.current_stage = "wrap_up"
                 wrap_msg = "Thank you for sharing all this valuable information! Do you have any questions for me about the position or our company?"
                 self.add_to_history("HR", wrap_msg)
                 return wrap_msg
-            
-            # Add transitional phrases for more natural flow
-            transitions = [
-                "Thank you for sharing that. ",
-                "I appreciate that information. ",
-                "That's helpful to know. ",
-                "Good to understand your background. ",
-                "That's great context. "
-            ]
-            
-            transition = random.choice(transitions) if self.question_count > 1 else ""
-            next_q = self.generate_general_hr_question(last_response=candidate_response)
+
+            # Add transitional phrases and special transition before tech questions start
+            if self.tech_stage_started and len(self.covered_topics) == len(self.hr_topics) and self.question_count == len(self.hr_topics):
+                transition = "Thanks for sharing that context. Let's talk a bit about your technical experience now. "
+            else:
+                transitions = [
+                    "Thank you for sharing that. ",
+                    "I appreciate that information. ",
+                    "That's helpful to know. ",
+                    "Good to understand your background. ",
+                    "That's great context. "
+                ]
+                transition = random.choice(transitions) if self.question_count > 1 else ""
+
+            next_q = self.generate_next_question(last_response=candidate_response, resume=self.candidate_info.get("resume_text", "") if self.candidate_info else "")
             return f"{transition}{next_q}"
 
         # Wrap-up stage
