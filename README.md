@@ -12,10 +12,10 @@ An intelligent HR chatbot that conducts initial screening interviews using Retri
 2. Create and activate a virtual environment
 3. Install dependencies
 4. Create a .env file:
-   GROQ_API_KEY=your_groq_api_key
-   PINECONE_API_KEY=your_pinecone_api_key
-   PINECONE_INDEX_NAME=hr-rag-sys
-   PINECONE_ENVIRONMENT=your_pinecone_environment
+  - GROQ_API_KEY=your_groq_api_key
+  - PINECONE_API_KEY=your_pinecone_api_key
+  - PINECONE_INDEX_NAME=hr-rag-sys
+  - PINECONE_ENVIRONMENT=your_pinecone_environment
 
 
 ## **To Run the Application:**
